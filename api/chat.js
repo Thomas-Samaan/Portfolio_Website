@@ -1,23 +1,40 @@
 export default async function handler(req, res) {
-  // Only allow POST requests
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+    if (req.method !== "POST") {
+        return res.status(405).json({ error: "Method not allowed" });
+    }
 
-  try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
-      },
-      body: JSON.stringify(req.body)
-    });
+    const { messages } = req.body;
 
-    const data = await response.json();
-    return res.status(200).json(data);
+    if (!messages) {
+        return res.status(400).json({ error: "Missing 'messages' in request body" });
+    }
 
-  } catch (error) {
-    return res.status(500).json({ error: "Something went wrong" });
-  }
+    try {
+        const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: messages,
+                temperature: 0.3,
+                max_tokens: 500
+            })
+        });
+
+        const data = await groqResponse.json();
+
+        if (!groqResponse.ok) {
+            console.error("Groq API error:", data);
+            return res.status(groqResponse.status).json(data);
+        }
+
+        return res.status(200).json(data);
+
+    } catch (error) {
+        console.error("Server error calling Groq:", error);
+        return res.status(500).json({ error: "Failed to reach Groq API" });
+    }
 }
